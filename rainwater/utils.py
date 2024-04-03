@@ -129,3 +129,19 @@ def print_sequences(filename: str, seq_list, create_new=True):
                 for i in range(0, seq.length()):
                     element = seq.get_i(i)
                     f.write("%s,%s,%f,%s\n" % (seq.get_tag(), element[0], element[1], element[2]))
+
+
+def print_full_sequences(filename: str, seq_list, create_new=True):
+    """
+    Prints a list of sequences to a file
+    :param filename: name of the file
+    :param seq_list: list of sequences to print
+    :param create_new: True if the files needs to be created, otherwise it appends
+    """
+
+    open_flag = 'w' if create_new else 'a'
+    for seq in seq_list:
+        if seq is not None:
+            to_write = seq.get_all_data()
+            to_write.to_csv(filename, mode=open_flag, index=False)
+            open_flag = 'a'

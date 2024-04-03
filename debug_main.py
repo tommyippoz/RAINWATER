@@ -7,7 +7,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 from rainwater import get_injectors
-from rainwater.utils import read_csv, load_dataset_config, print_sequences
+from rainwater.utils import read_csv, load_dataset_config, print_sequences, print_full_sequences
 
 INPUT_FOLDER = 'input'
 SEQ_FILE = 'preprocessed/preproc_all.csv'
@@ -30,21 +30,25 @@ if __name__ == '__main__':
 
             # Injecting anomalies
             injected_sequences = []
+            print('\nPerforming Injection...')
             for injector in get_injectors(dataset_info['threats'], dataset_info['duration'],
                                           dataset_info['min_normal'], dataset_info['perc_inj']):
                 for seq in sequences:
-                    injected_sequences.append(injector.inject(seq))
+                    new_s = injector.inject(seq)
+                    if new_s is not None:
+                        injected_sequences.append(new_s)
 
-            #for seq in injected_sequences:
-
-
+            print('\nComputing Additional Features ...')
+            for seq in injected_sequences:
+                seq.add_features()
 
             # Prints a file for each dataset
+            print('\nPrinting Data ...')
             dataset_file = SEQ_FILE.replace(".csv", "_" + cfg_file).replace(".cfg", ".csv")
-            print_sequences(dataset_file, injected_sequences, create_new=True)
+            print_full_sequences(dataset_file, injected_sequences, create_new=True)
 
             # Prints a file containing everything
-            print_sequences(SEQ_FILE, injected_sequences, create_new=create_file)
+            print_full_sequences(SEQ_FILE, injected_sequences, create_new=create_file)
             create_file = False
 
 

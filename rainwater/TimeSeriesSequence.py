@@ -1,3 +1,6 @@
+import copy
+import datetime
+
 import numpy
 import pandas
 
@@ -6,62 +9,91 @@ class TimeSeriesSequence:
 
     def __init__(self, tag: str, times: numpy.ndarray, values: numpy.ndarray, labels: numpy.ndarray = None):
         self.tag = tag
-        if labels is None:
-            labels = ['normal' for _ in range(0, len(values))]
-        self.seq_data = pandas.DataFrame()
-        self.seq_data['times'] = times
-        self.seq_data['values'] = values
-        self.seq_data['labels'] = labels
+        self.times = times
+        self.values = values
+        self.labels = labels
+        self.additional_features = None
+        if self.labels is None:
+            self.labels = ['normal' for _ in range(0, len(values))]
 
     def get_times(self):
-        return self.seq_data['times'].to_numpy()
+        return self.times
 
     def get_values(self):
-        return self.seq_data['values'].to_numpy()
+        return self.values
 
     def get_labels(self):
-        return self.seq_data['labels'].to_numpy()
+        return self.labels
 
     def get_i(self, index: int):
-        return self.seq_data.iloc[index]
+        return [self.times[index], self.values[index], self.labels[index]]
 
     def length(self):
-        return len(self.seq_data.index)
+        if self.values is not None:
+            return len(self.values)
+        else:
+            return 0
 
     def get_tag(self):
         return self.tag
 
     def add_features(self):
-        f_name = 'lumped_kWh'
+        # Init DataFrame
+        new_f = pandas.DataFrame()
+        new_f['base'] = self.values
+        new_f['time'] = self.times
 
-        # differences
-        batch['diff t-1'] = batch[f_name] - batch[f_name].shift(1)
-        batch['diff t-2'] = batch[f_name] - batch[f_name].shift(2)
-        batch['diff t-3'] = batch[f_name] - batch[f_name].shift(3)
-        batch['diff t-4'] = batch[f_name] - batch[f_name].shift(4)
-        batch['diff t-5'] = batch[f_name] - batch[f_name].shift(5)
-        batch = batch.fillna(0)
+        # Init vars
+        min_diff = int((self.times[1] - self.times[0]).astype('timedelta64[m]') / numpy.timedelta64(1, 'm'))
+        obs_next_hour = int(60 / min_diff)
+        obs_next_day = 24 * obs_next_hour
 
-        #  relative differences
-        batch['rdiff t-1'] = [batch['diff t-1'][i] / batch[f_name][i] if batch[f_name][i] != 0 else 1
-                              for i in batch.index]
-        batch['rdiff t-2'] = [batch['diff t-2'][i] / batch[f_name][i] if batch[f_name][i] != 0 else 1
-                              for i in batch.index]
-        batch['rdiff t-3'] = [batch['diff t-3'][i] / batch[f_name][i] if batch[f_name][i] != 0 else 1
-                              for i in batch.index]
-        batch['rdiff t-4'] = [batch['diff t-4'][i] / batch[f_name][i] if batch[f_name][i] != 0 else 1
-                              for i in batch.index]
-        batch['rdiff t-5'] = [batch['diff t-5'][i] / batch[f_name][i] if batch[f_name][i] != 0 else 1
-                              for i in batch.index]
-        batch = batch.fillna(1)
+        # General Features
+        new_f['dayofweek'] = new_f['time'].dt.dayofweek
+        new_f['is_weekday'] = new_f['dayofweek'] < 5
+        new_f['is_weekend'] = new_f['dayofweek'] >= 5
 
-        # moving averages
-        batch['diff ma-2'] = batch[f_name] - batch.rolling(window=2)[f_name].mean()
-        batch['diff ma-3'] = batch[f_name] - batch.rolling(window=3)[f_name].mean()
-        batch['diff ma-4'] = batch[f_name] - batch.rolling(window=4)[f_name].mean()
-        batch['diff ma-5'] = batch[f_name] - batch.rolling(window=5)[f_name].mean()
-        batch = batch.fillna(0)
+        # Differences Between Features
+        new_f['diff t-1'] = new_f['base'] - new_f['base'].shift(1)
+        new_f['diff t-2'] = new_f['base'] - new_f['base'].shift(2)
+        new_f['diff t-3'] = new_f['base'] - new_f['base'].shift(3)
+        new_f['diff t-5'] = new_f['base'] - new_f['base'].shift(5)
+        new_f['diff t-10'] = new_f['base'] - new_f['base'].shift(10)
+        new_f['diff hour'] = new_f['base'] - new_f['base'].shift(obs_next_hour)
+        new_f['diff day'] = new_f['base'] - new_f['base'].shift(obs_next_day)
+        new_f = new_f.fillna(0)
 
-        # cleanup
-        batch = batch.drop(columns=['index'])
-        return batch
+        #  Relative Differences between Features
+        new_f['rdiff t-1'] = [new_f['diff t-1'][i] / new_f['base'][i] if new_f['base'][i] != 0 else 1
+                              for i in new_f.index]
+        new_f['rdiff t-2'] = [new_f['diff t-2'][i] / new_f['base'][i] if new_f['base'][i] != 0 else 1
+                              for i in new_f.index]
+        new_f['rdiff t-3'] = [new_f['diff t-3'][i] / new_f['base'][i] if new_f['base'][i] != 0 else 1
+                              for i in new_f.index]
+        new_f['rdiff t-5'] = [new_f['diff t-5'][i] / new_f['base'][i] if new_f['base'][i] != 0 else 1
+                              for i in new_f.index]
+        new_f['rdiff t-10'] = [new_f['diff t-10'][i] / new_f['base'][i] if new_f['base'][i] != 0 else 1
+                               for i in new_f.index]
+        new_f['rdiff t-hour'] = [new_f['diff hour'][i] / new_f['base'][i] if new_f['base'][i] != 0 else 1
+                                 for i in new_f.index]
+        new_f['rdiff t-day'] = [new_f['diff day'][i] / new_f['base'][i] if new_f['base'][i] != 0 else 1
+                                for i in new_f.index]
+        new_f = new_f.fillna(1)
+
+        # Moving Averages
+        new_f['diff ma-2'] = new_f['base'] - new_f.rolling(window=2)['base'].mean()
+        new_f['diff ma-3'] = new_f['base'] - new_f.rolling(window=3)['base'].mean()
+        new_f['diff ma-5'] = new_f['base'] - new_f.rolling(window=5)['base'].mean()
+        new_f['diff ma-10'] = new_f['base'] - new_f.rolling(window=10)['base'].mean()
+        new_f['diff ma-hour'] = new_f['base'] - new_f.rolling(window=obs_next_hour)['base'].mean()
+        new_f['diff ma-day'] = new_f['base'] - new_f.rolling(window=obs_next_day)['base'].mean()
+        new_f = new_f.fillna(0)
+
+        self.additional_features = new_f.drop(columns=['base', 'time'])
+
+    def get_all_data(self):
+        all_df = copy.deepcopy(self.additional_features)
+        all_df['timestamp'] = self.times
+        all_df['values'] = self.values
+        all_df['label'] = self.labels
+        return all_df
