@@ -1,8 +1,24 @@
 import copy
-import datetime
 
 import numpy
 import pandas
+
+
+def sequences_to_dataset(sequences: list, force_binary: bool = False):
+    """
+    Transforms a list of TimeSeriesSequence to dataset for ML
+    :param sequences: list of sequences
+    :return: the features and the label
+    """
+    data_list = []
+    for sequence in sequences:
+        data_list.append(sequence.get_all_data())
+    dataset = pandas.concat(data_list, ignore_index=True)
+    label = dataset['label'].to_numpy()
+    if force_binary:
+        label = numpy.where(label == 'normal', 'normal', 'anomaly')
+    dataset = dataset.drop(columns=['timestamp', 'label'])
+    return dataset, label
 
 
 class TimeSeriesSequence:
@@ -50,8 +66,8 @@ class TimeSeriesSequence:
 
         # General Features
         new_f['dayofweek'] = new_f['time'].dt.dayofweek
-        new_f['is_weekday'] = new_f['dayofweek'] < 5
-        new_f['is_weekend'] = new_f['dayofweek'] >= 5
+        new_f['is_weekday'] = (new_f['dayofweek'] < 5) * 1
+        new_f['is_weekend'] = (new_f['dayofweek'] >= 5) * 1
 
         # Differences Between Features
         new_f['diff t-1'] = new_f['base'] - new_f['base'].shift(1)
@@ -94,6 +110,6 @@ class TimeSeriesSequence:
     def get_all_data(self):
         all_df = copy.deepcopy(self.additional_features)
         all_df['timestamp'] = self.times
-        all_df['values'] = self.values
+        all_df['consumption'] = self.values
         all_df['label'] = self.labels
         return all_df

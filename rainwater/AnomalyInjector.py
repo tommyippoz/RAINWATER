@@ -1,8 +1,6 @@
 import copy
 import random
 
-import numpy
-
 from .TimeSeriesSequence import TimeSeriesSequence
 
 

@@ -1,21 +1,22 @@
 import os.path
 
-import numpy
-import numpy as np
-import pandas as pd
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix
-
 from rainwater import get_injectors
-from rainwater.utils import read_csv, load_dataset_config, print_sequences, print_full_sequences
-
-INPUT_FOLDER = 'input'
-SEQ_FILE = 'preprocessed/preproc_all.csv'
+from rainwater.ModelTrainer import ModelTrainer
+from rainwater.utils import read_csv, load_dataset_config, print_full_sequences, read_general_conf
 
 if __name__ == '__main__':
 
+    # Reading general info
+    general_cfg = read_general_conf('general_cfg.cfg')
+
+    # Set the model trainer once
+    model_trainer = ModelTrainer(policy=general_cfg['policy'],
+                                 tt_split=general_cfg['tt_split'],
+                                 force_binary=general_cfg['force_binary'])
+
+    # Iterating over input files
     create_file = True
-    for cfg_file in os.listdir(INPUT_FOLDER):
+    for cfg_file in os.listdir(general_cfg['input_folder']):
 
         if not cfg_file.endswith('.cfg'):
             print('File %s is not a configuration file' % cfg_file)
@@ -23,7 +24,8 @@ if __name__ == '__main__':
         else:
             # Read Sequences from Dataset
             print('\n---------------------------------------------\nReading dataset \'%s\'' % cfg_file)
-            dataset_info = load_dataset_config(os.path.join(INPUT_FOLDER, cfg_file))
+            dataset_name = cfg_file.replace(".cfg", "")
+            dataset_info = load_dataset_config(os.path.join(general_cfg['input_folder'], cfg_file))
             sequences = read_csv(dataset_info['csv_path'], dataset_info['kwh_col'],
                                  dataset_info['time_col'], dataset_info['seq_col'],
                                  dataset_info['batch_size'], dataset_info['limit_rows'])
@@ -44,118 +46,60 @@ if __name__ == '__main__':
 
             # Prints a file for each dataset
             print('\nPrinting Data ...')
-            dataset_file = SEQ_FILE.replace(".csv", "_" + cfg_file).replace(".cfg", ".csv")
+            dataset_file = os.path.join(general_cfg['output_folder'],
+                                        general_cfg['data_tag'] + "_" + dataset_name + ".csv")
             print_full_sequences(dataset_file, injected_sequences, create_new=True)
 
             # Prints a file containing everything
-            print_full_sequences(SEQ_FILE, injected_sequences, create_new=create_file)
+            #big_file = os.path.join(general_cfg['output_folder'], general_cfg['data_tag'] + ".csv")
+            #print_full_sequences(big_file, injected_sequences, create_new=create_file)
             create_file = False
 
+            # Performs model training
+            model, stats, preds = model_trainer.train(injected_sequences, dataset_name=dataset_name,
+                                                      models_folder=general_cfg['models_folder'],
+                                                      save=True, debug=True)
 
+            # Prints predictions
+            preds_file = os.path.join(general_cfg['output_folder'], dataset_name +
+                                      ("_binary" if general_cfg['force_binary'] else "_multi") +
+                                      "_predictions.csv")
+            preds.to_csv(preds_file, index=False)
 
+            # prints csv file containing all stats
+            with open(os.path.join(general_cfg['output_folder'],
+                                   dataset_name + ("_binary" if general_cfg['force_binary'] else "_multi") +
+                                   '_scores.csv'), 'w') as csvfile:
 
+                # Print Header
+                csvfile.write('policy,')
+                stat = stats[list(stats.keys())[0]][0]
+                for key in stat.keys():
+                    if isinstance(stat[key], dict):
+                        for dict_key in stat[key]:
+                            if isinstance(stat[key][dict_key], dict):
+                                for inner_key in stat[key][dict_key]:
+                                    if not isinstance(stat[key][dict_key][inner_key], list):
+                                        csvfile.write(key + "." + dict_key + "." + inner_key + ",")
+                            elif not isinstance(stat[key][dict_key], list):
+                                csvfile.write(key + "." + dict_key + ",")
+                    elif not isinstance(stat[key], list):
+                        csvfile.write(key + ",")
+                csvfile.write('\n')
 
-
-def other():
-    # Read the train dataset
-    data = pd.read_csv(TRAIN_FILE)
-    y_train = data['label']
-    x_train = data.drop(columns=['label', 'device_Id', 'timestamp_created'])
-    x_train = x_train.to_numpy()
-
-    # Read the test dataset
-    data = pd.read_csv(TEST_FILE)
-    test_split_indexes = [v for v in data[(data["device_Id"].shift() != data["device_Id"]) != 0].index if v > 0]
-    device_ids = data['device_Id'][data[(data["device_Id"].shift() != data["device_Id"]) != 0].index].to_numpy()
-    y_test = data['label']
-    x_test = data.drop(columns=['label', 'device_Id', 'timestamp_created'])
-    x_test = x_test.to_numpy()
-
-    # Prepare test set for DD and Fpr
-    x_test_batch = numpy.split(x_test, test_split_indexes)
-    y_test_batch = numpy.split(y_test, test_split_indexes)
-
-    # Exercise different classifiers (only decision tree to generate the model)
-    print('Using %d rows for training, %d for testing' % (len(y_train), len(y_test)))
-
-    clf = DecisionTreeClassifier(random_state=42)
-    clf.fit(x_train, y_train)
-
-    # Make predictions on the testing set and compute accuracy
-    y_pred = clf.predict(x_test)
-    accuracy = accuracy_score(y_test, y_pred)
-
-    # Array of DDs for each device series in the test set
-    dd = []
-    # Array of FPRs for each device series in the test set
-    fpr = []
-    # Lists to accumulate counts for confusion matrix
-    true_labels = []
-    pred_labels = []
-    # Array of TPRs for each device series in the test set
-    tprs= []
-    # Results
-    device_dict = {}
-
-    # Compute DD and FPR
-    index = 0
-    for x_device in x_test_batch:
-        y_pred_device = clf.predict(x_device)
-        y_test_device = y_test_batch[index].to_numpy()
-
-
-        # find first occurrence of anomaly in the series for that device
-        anomaly_index = next((i for i in range(len(y_test_device)) if y_test_device[i] > 0), -1)
-
-        dict_res = {}
-        # Update fpr and DD
-        if anomaly_index > 0:
-            # It means that an anomaly exists in the series for the device
-            fpr.append(sum(y_pred_device[:anomaly_index]*(1-y_test_device[:anomaly_index]))/(anomaly_index+1))
-            tp = np.where((y_pred_device + y_test_device == 2))[0]
-            dd.append((tp[0] - anomaly_index) if len(tp) > 0 else 1000)
-            tpr = 1 if len(tp) > 0 else 0
-            tprs.append(tpr)
-            dict_res = {'tpr': tpr,
-                        'fpr': sum(y_pred_device[:anomaly_index]*(1-y_test_device[:anomaly_index]))/(anomaly_index+1),
-                        'dd': (tp[0] - anomaly_index) if len(tp) > 0 else 1000}
-        else:
-            # It means that no anomaly is found in the series for the device
-            #fpr.append(-1)
-            #dd.append(-1)
-            dict_res = {'tpr': -1,
-                        'fpr': -1,
-                        'dd': -1}
-            print('no anomaly was found')
-        device_dict[device_ids[index]] = dict_res
-
-        # Accumulate true and predicted labels for confusion matrix
-        true_labels.extend(y_test_device)
-        pred_labels.extend(y_pred_device)
-
-        # Compute confusion matrix
-        a = confusion_matrix(true_labels, pred_labels).ravel()
-        tn, fp, fn, tp = confusion_matrix(true_labels, pred_labels).ravel()
-
-        index += 1
-
-
-    # Print Metrics and Confusion Matrix
-    print("\n-------CLASSIFIER DecisionTree -------------")
-    print("Confusion Matrix: [tn:%d, tp:%d, fn:%d, fp:%d], ACC:%.3f" % (tn, tp, fn, fp, accuracy))
-    print("DD [Med, Avg, Max]: [%d, %.3f, %d] - all: (%s)" % (numpy.median(dd), numpy.average(dd), numpy.max(dd),
-                                                       "; ".join([str(d) for d in dd])))
-    print("FPR [Med, Avg]: [%.3f, %.3f] - all: (%s), TPR [Med, Avg]: [%d, %.3f]" %
-          (numpy.median(fpr), numpy.average(fpr), "; ".join(["{:.3f}".format(d) for d in fpr]), numpy.median(tprs), numpy.average(tprs)))
-
-
-    final_df = data[['lumped_kWh', 'device_Id', 'timestamp_created', 'label']]
-    final_df['prediction_dt'] = pred_labels
-    final_df.to_csv('debug_output_dt.csv', index=False)
-
-    with open('metrics_all.csv', 'w') as f:  # You will need 'wb' mode in Python 2.x
-        f.write('device_id, tpr, fpr, dd\n')
-        for res_d in device_dict.keys():
-            f.write(res_d + ',' + str(device_dict[res_d]['tpr']) + ',' +
-                    str(device_dict[res_d]['fpr']) + ',' + str(device_dict[res_d]['dd']) + "\n")
-
+                # Print Data
+                for policy in stats:
+                    for stat in stats[policy]:
+                        txt_row = policy + ","
+                        for key in stat.keys():
+                            if isinstance(stat[key], dict):
+                                for dict_key in stat[key]:
+                                    if isinstance(stat[key][dict_key], dict):
+                                        for inner_key in stat[key][dict_key]:
+                                            if not isinstance(stat[key][dict_key][inner_key], list):
+                                                txt_row += str(stat[key][dict_key][inner_key]) + ","
+                                    elif not isinstance(stat[key][dict_key], list):
+                                        txt_row += str(stat[key][dict_key]) + ","
+                            elif not isinstance(stat[key], list):
+                                txt_row += str(stat[key]) + ","
+                        csvfile.write(txt_row + '\n')
