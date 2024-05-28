@@ -39,12 +39,24 @@ class AnomalyInjector:
 
     def __init__(self, duration: int = 1, tag: str = 'injection',
                  min_normal: int = 5, perc_inj: float = 0.1):
+        """
+        Constructor
+        :param duration: the duration of the injection (number of data points)
+        :param tag: the tag associated to the injection
+        :param min_normal: the amount of data points at the beginning of the sequence that have to be left unaltered
+        :param perc_inj: the probability of the injection to happen at a given instant
+        """
         self.duration = duration
         self.min_normal = min_normal
         self.perc_inj = perc_inj
         self.tag = tag + "@" + str(self.duration) + "@" + str(self.min_normal)
 
     def inject(self, seq: TimeSeriesSequence):
+        """
+        Method for injecting an anomaly inside a sequence
+        :param seq: the sequence to be modified
+        :return: the injected sequence
+        """
         if seq is None:
             print('sequence to inject is None')
             return None
@@ -66,9 +78,20 @@ class AnomalyInjector:
         return new_seq
 
     def get_name(self):
+        """
+        Gets the tag of the injection
+        :return: a string (injection tag)
+        """
         return self.tag
 
     def inject_anomaly(self, seq: TimeSeriesSequence, from_index: int, to_index: int):
+        """
+        Placeholder for the abstract inject_anomaly function to be overridden by child classes
+        :param seq: the sequence to be injected
+        :param from_index: start of the injection
+        :param to_index: end of the injection
+        :return: the injected sequence
+        """
         return None
 
 
@@ -76,10 +99,24 @@ class LoadMultiplier(AnomalyInjector):
 
     def __init__(self, duration: int = 1, min_normal: int = 5,
                  perc_inj: float = 0.1, mult_factor: float = 2):
+        """
+        Constructor
+        :param duration: the duration of the injection (number of data points)
+        :param min_normal: the amount of data points at the beginning of the sequence that have to be left unaltered
+        :param perc_inj: the probability of the injection to happen at a given instant
+        :param mult_factor: the float value used as multiplier for the consumption
+        """
         super().__init__(duration, 'load-multiplier-' + str(mult_factor), min_normal, perc_inj)
         self.mult_factor = mult_factor
 
     def inject_anomaly(self, seq: TimeSeriesSequence, from_index: int, to_index: int):
+        """
+        Implements the injection
+        :param seq: the sequence to be injected
+        :param from_index: start of the injection
+        :param to_index: end of the injection
+        :return: the injected sequence
+        """
         series_slice = seq.get_values()[from_index:to_index]
         inj_array = series_slice*self.mult_factor
         return inj_array
@@ -88,9 +125,22 @@ class LoadMultiplier(AnomalyInjector):
 class ZeroInjector(AnomalyInjector):
 
     def __init__(self, duration: int = 1, min_normal: int = 5, perc_inj: float = 0.1):
+        """
+        Constructor
+        :param duration: the duration of the injection (number of data points)
+        :param min_normal: the amount of data points at the beginning of the sequence that have to be left unaltered
+        :param perc_inj: the probability of the injection to happen at a given instant
+        """
         super().__init__(duration, 'zero', min_normal, perc_inj)
 
     def inject_anomaly(self, seq: TimeSeriesSequence, from_index: int, to_index: int):
+        """
+        Implements the injection
+        :param seq: the sequence to be injected
+        :param from_index: start of the injection
+        :param to_index: end of the injection
+        :return: the injected sequence
+        """
         series_slice = seq.get_values()[from_index:to_index]
         inj_array = series_slice * 0.0
         return inj_array
@@ -99,9 +149,22 @@ class ZeroInjector(AnomalyInjector):
 class RepeatInjector(AnomalyInjector):
 
     def __init__(self, duration: int = 1, min_normal: int = 5, perc_inj: float = 0.1):
+        """
+        Constructor
+        :param duration: the duration of the injection (number of data points)
+        :param min_normal: the amount of data points at the beginning of the sequence that have to be left unaltered
+        :param perc_inj: the probability of the injection to happen at a given instant
+        """
         super().__init__(duration, 'repeat', min_normal, perc_inj)
 
     def inject_anomaly(self, seq: TimeSeriesSequence, from_index: int, to_index: int):
+        """
+        Implements the injection
+        :param seq: the sequence to be injected
+        :param from_index: start of the injection
+        :param to_index: end of the injection
+        :return: the injected sequence
+        """
         series_slice = seq.get_values()[from_index:to_index]
         inj_array = seq.get_values()[from_index-1] + series_slice * 0.0
         return inj_array

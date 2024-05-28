@@ -21,9 +21,21 @@ from rainwater.DecisionPolicy import policy_to_string, apply_policy
 
 
 class ModelTrainer:
+    """
+    Class that exposes the methods for training a classifier for a problem.
+    Compares a set of classifiers over a set of sequances, performing data augmentation in the process.
+    The dataset has to have a feature that shows power consumption.
+    """
 
     def __init__(self, policy: list = [DecisionPolicy.NONE], tt_split: float = 0.5,
                  force_binary: bool = False, clf_list: list = None):
+        """
+        Constructor
+        :param policy: the DecisionPolicy(ies) to be used in a list
+        :param tt_split: the percentage of sequences to be used for training (others for testing)
+        :param force_binary: True if binary classification, multi-class otherwise
+        :param clf_list: the list of candidate classifiers to be used.
+        """
         self.policies = policy
         self.tt_split = tt_split
         self.force_binary = force_binary
@@ -44,6 +56,10 @@ class ModelTrainer:
               dataset_name: str = None, save: bool = False, debug: bool = False):
         """
         Trains a model for a specific dataset of sequences
+        :param save: True if the model and stats have to be saved to joblib and JSON files
+        :param dataset_name: the name/tag of the dataset
+        :param models_folder: the folder used to load/store models
+        :param diagnosis_time: placeholder - not implemented yet
         :param debug: True if debug information has to be shown
         :param sequences: the sequences to be used for train/test
         :return: the trained model and the (performance) stats
@@ -121,15 +137,25 @@ class ModelTrainer:
 
 class XGB:
     """
-    Wrapper for the sklearn.LogisticRegression algorithm
+    Wrapper for the xgboost.XGBClassifier algorithm to overcome the problem with string labels
     """
 
     def __init__(self, n_estimators=100):
+        """
+        Constructor
+        :param n_estimators: number of estimators
+        """
         self.clf = XGBClassifier(n_estimators=n_estimators)
         self.l_encoder = None
         self.classes = None
 
     def fit(self, X, y=None):
+        """
+        Trains the classifier
+        :param X: train features
+        :param y: train labels
+        :return: the trained model
+        """
 
         # Check that X and y have correct shape
         self.l_encoder = LabelEncoder()
@@ -145,10 +171,15 @@ class XGB:
     def predict(self, X):
         """
         Method to compute predict of a classifier
+        :param X: test features
         :return: array of predicted class
         """
         probas = self.clf.predict_proba(X)
         return self.classes[numpy.argmax(probas, axis=1)]
 
     def classifier_name(self):
+        """
+        Returns the name of the classifier
+        :return: a string
+        """
         return "XGBClassifier"

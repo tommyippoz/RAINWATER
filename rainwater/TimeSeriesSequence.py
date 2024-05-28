@@ -7,6 +7,7 @@ import pandas
 def sequences_to_dataset(sequences: list, force_binary: bool = False):
     """
     Transforms a list of TimeSeriesSequence to dataset for ML
+    :param force_binary: True if you want classification to be forced as binary
     :param sequences: list of sequences
     :return: the features and the label
     """
@@ -22,8 +23,18 @@ def sequences_to_dataset(sequences: list, force_binary: bool = False):
 
 
 class TimeSeriesSequence:
+    """
+    Class that defines the object of a time-ordered sequence (of power consumption)
+    """
 
     def __init__(self, tag: str, times: numpy.ndarray, values: numpy.ndarray, labels: numpy.ndarray = None):
+        """
+        Constructor
+        :param tag: the tag associated to the sequence
+        :param times: the timestamps
+        :param values: the consumption values
+        :param labels: the labels (if none, all considered normal)
+        """
         self.tag = tag
         self.times = times
         self.values = values
@@ -33,27 +44,56 @@ class TimeSeriesSequence:
             self.labels = ['normal' for _ in range(0, len(values))]
 
     def get_times(self):
+        """
+        Gets the timestamps of a sequence
+        :return: a list
+        """
         return self.times
 
     def get_values(self):
+        """
+        Gets the values of the sequence
+        :return: a list
+        """
         return self.values
 
     def get_labels(self):
+        """
+        Gets the labels of the sequence
+        :return: a list
+        """
         return self.labels
 
     def get_i(self, index: int):
+        """
+        Getter for the i-th item of the sequence
+        :param index: the index of the item
+        :return: a triple of [timestamp, consumption value (+ additional features), label]
+        """
         return [self.times[index], self.values[index], self.labels[index]]
 
     def length(self):
+        """
+        Returns the length of the sequence
+        :return: an int
+        """
         if self.values is not None:
             return len(self.values)
         else:
             return 0
 
     def get_tag(self):
+        """
+        Returns the tag for the sequence
+        :return: a string
+        """
         return self.tag
 
     def add_features(self):
+        """
+        Creates additional features starting from the consumption feature
+        :return: nothing
+        """
         # Init DataFrame
         new_f = pandas.DataFrame()
         new_f['base'] = self.values

@@ -12,6 +12,16 @@ from rainwater.DecisionPolicy import DecisionPolicy, policy_from_string
 
 def read_csv(filepath: str, kwh_col: str = 'kWh', time_col: str = 'timestamp',
              seq_col: str = 'device_id', batch_size: int = None, limit_rows: int = -1):
+    """
+    Reads a dataset stored as csv file
+    :param filepath: path to the file
+    :param kwh_col: name of the csv column containing the consumption
+    :param time_col: name of the csv column containing the timestamp
+    :param seq_col: name of the csv column that is used to distinguish between series (if any)
+    :param batch_size: (used in case seq_col does not exist) length of series in number of data points
+    :param limit_rows: (optional) used to use a subset of the dataset
+    :return: a list of time series
+    """
     # Read the dataset
     dataset_name = filepath.split('/')[-1].replace(".csv", "")
     if limit_rows > 0:
@@ -56,12 +66,17 @@ def read_csv(filepath: str, kwh_col: str = 'kWh', time_col: str = 'timestamp',
         seq_data.reset_index(inplace=True)
         seq_tag = dataset_name + '_' + str(seq_data[seq_col][0])
         sequences.append(TimeSeriesSequence(seq_tag, numpy.asarray(seq_data[time_col]),
-                                            numpy.asarray(seq_data[kwh_col]), None))
+                                            numpy.asarray(seq_data[kwh_col], dtype=float), None))
 
     return sequences
 
 
 def load_dataset_config(cfg_file):
+    """
+    Loads parameters for execution from a configuration file. Specific for dataset loaders
+    :param cfg_file: the path to the configuration file
+    :return: a dictionary
+    """
     # Loading Conf file
     if not os.path.exists(cfg_file):
         return None
@@ -116,6 +131,11 @@ def load_dataset_config(cfg_file):
 
 
 def read_general_conf(cfg_file):
+    """
+    Loads parameters for execution from a configuration file.
+    :param cfg_file: the path to the configuration file
+    :return: a dictionary
+    """
     # Loading Conf file
     if not os.path.exists(cfg_file):
         return None
@@ -280,10 +300,13 @@ def compute_single_stats(pred_y, test_y, classes, test_sequences=None, diagnosis
             dds.append((det_time - an_time) if an_time <= det_time else numpy.NaN)
 
         stats['s_fpr'] = {'avg': float(numpy.average(fprs)), 'min': float(numpy.min(fprs)),
-                          'max': float(numpy.max(fprs)), 'median': float(numpy.median(fprs)), 'all': fprs}
+                          'max': float(numpy.max(fprs)), 'median': float(numpy.median(fprs)), #'all': fprs
+                          }
         stats['s_tpr'] = {'avg': float(numpy.average(tprs)), 'min': int(numpy.min(tprs)),
-                          'max': int(numpy.max(tprs)), 'median': int(numpy.median(tprs)), 'all': tprs}
+                          'max': int(numpy.max(tprs)), 'median': int(numpy.median(tprs)), #'all': tprs
+                          }
         stats['s_dd'] = {'avg': float(numpy.nanmean(dds)), 'min': int(numpy.nanmin(dds)),
-                         'max': int(numpy.nanmax(dds)), 'median': int(numpy.nanmedian(dds)), 'all': dds}
+                         'max': int(numpy.nanmax(dds)), 'median': int(numpy.nanmedian(dds)), #'all': dds
+                         }
 
     return stats

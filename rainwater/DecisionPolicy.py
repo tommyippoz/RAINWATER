@@ -5,7 +5,10 @@ import numpy
 
 class DecisionPolicy(Enum):
     """
-    Class for guiding the final decision on anomalies
+    Class for guiding the final decision on anomalies.
+    None means just output the result of the classifier
+    Other options are accounting for more observations consequently (two/three consecutive alerts)
+    or a given amount ofanomaly alerts k in the last n observations (k-o-o-n voting)
     """
     NONE = 1
     TWO_ROW = 2
@@ -15,7 +18,12 @@ class DecisionPolicy(Enum):
     TWO_IN_FOUR = 6
 
 
-def policy_from_string(p_str):
+def policy_from_string(p_str: str):
+    """
+    Converts a string into a DecisionPolicy object
+    :param p_str: the policy string
+    :return: the DecisionPolicy object
+    """
     if p_str in ['none', '', None, 'classifier', 'clf']:
         return DecisionPolicy.NONE
     elif p_str in ['2', 'two', 'double']:
@@ -33,7 +41,12 @@ def policy_from_string(p_str):
         return DecisionPolicy.NONE
 
 
-def policy_to_string(p_obj):
+def policy_to_string(p_obj: DecisionPolicy):
+    """
+    Converts a policy to the corresponding string
+    :param p_obj: the DecisionPolicy object
+    :return: a string
+    """
     if p_obj == DecisionPolicy.TWO_ROW:
         return '2'
     elif p_obj == DecisionPolicy.THREE_ROW:
@@ -48,7 +61,7 @@ def policy_to_string(p_obj):
         return 'none'
 
 
-def apply_policy(clf_y, p_obj, default_tag: str = 'normal'):
+def apply_policy(clf_y: numpy.ndarray, p_obj: DecisionPolicy, default_tag: str = 'normal'):
     """
     Returns predictions according to a specific policy
     :param clf_y: classifier predictions
