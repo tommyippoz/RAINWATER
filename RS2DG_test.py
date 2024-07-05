@@ -24,7 +24,7 @@ if __name__ == '__main__':
             print('File %s is not a configuration file' % cfg_file)
 
         elif 'RS2DG' not in cfg_file:
-            print('The data loader \'%s\' does not belong to RS2DG case study', cfg_file)
+            print('The data loader \'%s\' does not belong to RS2DG case study' % cfg_file)
 
         else:
             # Read Sequences from Dataset

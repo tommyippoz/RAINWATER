@@ -222,7 +222,8 @@ def print_full_sequences(filename: str, seq_list, create_new=True):
     for seq in seq_list:
         if seq is not None:
             to_write = seq.get_all_data()
-            to_write.to_csv(filename, mode=open_flag, index=False)
+            to_write['seq_name'] = [seq.tag for _ in to_write.index]
+            to_write.to_csv(filename, mode=open_flag, index=False, header=(False if open_flag == 'a' else True))
             open_flag = 'a'
 
 
