@@ -20,20 +20,28 @@ def get_injectors(desc_list: list, duration: int, min_normal: int, perc_inj: flo
         for item in desc_list:
             if item in ['increase_load', 'more_load', 'more', 'increase']:
                 injectors.append(LoadMultiplier(duration, min_normal, perc_inj, 2))
+                injectors.append(LoadMultiplier(duration, min_normal, perc_inj, 2.5))
             elif item in ['max_load', 'max']:
                 injectors.append(LoadMultiplier(duration, min_normal, perc_inj, 3))
             elif item in ['min_load', 'min']:
-                injectors.append(LoadMultiplier(duration, min_normal, perc_inj, 0.3))
+                injectors.append(LoadMultiplier(duration, min_normal, perc_inj, 0.2))
             elif item in ['decrease_load', 'less_load', 'less', 'decrease']:
+                injectors.append(LoadMultiplier(duration, min_normal, perc_inj, 0.35))
                 injectors.append(LoadMultiplier(duration, min_normal, perc_inj, 0.5))
             elif item in ['block', 'stop', 'zero', 'null', 'a3', 'A3']:
                 injectors.append(ZeroInjector(duration, min_normal, perc_inj))
+                injectors.append(ZeroInjector(duration, min_normal, perc_inj))
             elif item in ['repeat', 'more', 'replay', 'a6', 'A6']:
+                injectors.append(RepeatInjector(duration, min_normal, perc_inj))
                 injectors.append(RepeatInjector(duration, min_normal, perc_inj))
             elif item in ['noise', 'random', 'a2', 'A2']:
                 injectors.append(NoiseInjector(duration, min_normal, perc_inj, 1))
+                injectors.append(NoiseInjector(duration, min_normal, perc_inj, 2))
+                injectors.append(NoiseInjector(duration, min_normal, perc_inj, 0.5))
+                injectors.append(NoiseInjector(duration, min_normal, perc_inj, 0.8))
             elif item in ['threshold', 'thr', 'a1', 'A1']:
                 injectors.append(ThresholdInjector(duration, min_normal, perc_inj, 0.5))
+                injectors.append(ThresholdInjector(duration, min_normal, perc_inj, 0.7))
 
     return injectors
 
@@ -115,7 +123,7 @@ class LoadMultiplier(AnomalyInjector):
         :param perc_inj: the probability of the injection to happen at a given instant
         :param mult_factor: the float value used as multiplier for the consumption
         """
-        super().__init__(duration, 'load-multiplier-' + str(mult_factor), min_normal, perc_inj)
+        super().__init__(duration, ('load-increase' if mult_factor >= 1 else 'load-decrease'), min_normal, perc_inj)
         self.mult_factor = mult_factor
 
     def inject_anomaly(self, seq: TimeSeriesSequence, from_index: int, to_index: int):
@@ -190,7 +198,7 @@ class NoiseInjector(AnomalyInjector):
         :param perc_inj: the probability of the injection to happen at a given instant
         :param noise_factor: the float value used as multiplier for the noise (1 = no multiplier)
         """
-        super().__init__(duration, 'noise-' + str(noise_factor), min_normal, perc_inj)
+        super().__init__(duration, 'noise', min_normal, perc_inj)
         self.noise_factor = noise_factor
 
     def inject_anomaly(self, seq: TimeSeriesSequence, from_index: int, to_index: int):
@@ -218,7 +226,7 @@ class ThresholdInjector(AnomalyInjector):
         :param perc_inj: the probability of the injection to happen at a given instant
         :param thr_value: the float threshold value
         """
-        super().__init__(duration, 'thr-' + str(thr_value_perc), min_normal, perc_inj)
+        super().__init__(duration, 'thr', min_normal, perc_inj)
         self.thr_value_perc = thr_value_perc
 
     def inject_anomaly(self, seq: TimeSeriesSequence, from_index: int, to_index: int):

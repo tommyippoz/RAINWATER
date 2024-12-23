@@ -1,7 +1,7 @@
 import os.path
 
 from rainwater import get_injectors
-from rainwater.ModelTrainer import ModelTrainer
+from rainwater.ModelTrainer import ModelTrainer, UnknownModelTrainer
 from rainwater.utils import read_csv, load_dataset_config, print_full_sequences, read_general_conf
 
 if __name__ == '__main__':
@@ -12,10 +12,9 @@ if __name__ == '__main__':
     # Set the model trainer
     # In case you want to use custom classifiers, just put them in a list and pass them through clf_list
     # Make sure that these objects expose a fit, predict_proba and predict method
-    model_trainer = ModelTrainer(policy=general_cfg['policy'],
-                                 tt_split=general_cfg['tt_split'],
-                                 force_binary=general_cfg['force_binary'],
-                                 clf_list=None)
+    model_trainer = UnknownModelTrainer(policy=general_cfg['policy'],
+                                        tt_split=general_cfg['tt_split'],
+                                        clf_list=None)
 
     # Iterating over input files looking for the RS2DG data loader
     for cfg_file in os.listdir(general_cfg['input_folder']):
@@ -56,24 +55,21 @@ if __name__ == '__main__':
             print_full_sequences(dataset_file, injected_sequences, create_new=True)
 
             # Performs model training
-            model, stats, preds = model_trainer.train(injected_sequences, dataset_name=dataset_name,
-                                                      models_folder=general_cfg['models_folder'],
-                                                      save=True, debug=True)
+            dict_out = model_trainer.train(injected_sequences, dataset_name=dataset_name,
+                                           models_folder=general_cfg['models_folder'],
+                                           save=True, debug=True)
 
             # Prints predictions
-            preds_file = os.path.join(general_cfg['output_folder'], dataset_name +
-                                      ("_binary" if general_cfg['force_binary'] else "_multi") +
-                                      "_predictions.csv")
-            preds.to_csv(preds_file, index=False)
+            preds_file = os.path.join(general_cfg['output_folder'], dataset_name + "_binary_predictions.csv")
+            dict_out["normal"][2].to_csv(preds_file, index=False)
 
             # prints csv file containing all stats
-            with open(os.path.join(general_cfg['output_folder'],
-                                   dataset_name + ("_binary" if general_cfg['force_binary'] else "_multi") +
-                                   '_scores.csv'), 'w') as csvfile:
+            with open(os.path.join(general_cfg['output_folder'], dataset_name + '_unknown_scores.csv'), 'w') as csvfile:
 
                 # Prints Header
-                csvfile.write('policy,')
-                stat = stats[list(stats.keys())[0]][0]
+                normal_stats = dict_out["normal"][1]
+                csvfile.write('tag,policy,')
+                stat = normal_stats[list(normal_stats.keys())[0]][0]
                 for key in stat.keys():
                     if isinstance(stat[key], dict):
                         for dict_key in stat[key]:
@@ -82,7 +78,8 @@ if __name__ == '__main__':
                                     if isinstance(stat[key][dict_key][inner_key], dict):
                                         for inner_inner_key in stat[key][dict_key][inner_key]:
                                             if not isinstance(stat[key][dict_key][inner_key][inner_inner_key], list):
-                                                csvfile.write(key + "." + dict_key + "." + inner_key + "." + inner_inner_key + ",")
+                                                csvfile.write(
+                                                    key + "." + dict_key + "." + inner_key + "." + inner_inner_key + ",")
                                     elif not isinstance(stat[key][dict_key][inner_key], list):
                                         csvfile.write(key + "." + dict_key + "." + inner_key + ",")
                             elif not isinstance(stat[key][dict_key], list):
@@ -92,23 +89,26 @@ if __name__ == '__main__':
                 csvfile.write('\n')
 
                 # Prints Data
-                for policy in stats:
-                    for stat in stats[policy]:
-                        txt_row = policy + ","
-                        for key in stat.keys():
-                            if isinstance(stat[key], dict):
-                                for dict_key in stat[key]:
-                                    if isinstance(stat[key][dict_key], dict):
-                                        for inner_key in stat[key][dict_key]:
-                                            if isinstance(stat[key][dict_key][inner_key], dict):
-                                                for inner_inner_key in stat[key][dict_key][inner_key]:
-                                                    if not isinstance(stat[key][dict_key][inner_key][inner_inner_key],
-                                                                      list):
-                                                        txt_row += str(stat[key][dict_key][inner_key][inner_inner_key]) + ","
-                                            elif not isinstance(stat[key][dict_key][inner_key], list):
-                                                txt_row += str(stat[key][dict_key][inner_key]) + ","
-                                    elif not isinstance(stat[key][dict_key], list):
-                                        txt_row += str(stat[key][dict_key]) + ","
-                            elif not isinstance(stat[key], list):
-                                txt_row += str(stat[key]) + ","
-                        csvfile.write(txt_row + '\n')
+                for tag in dict_out:
+                    stats = dict_out[tag][1]
+                    for policy in stats:
+                        for stat in stats[policy]:
+                            txt_row = tag + "," + policy + ","
+                            for key in stat.keys():
+                                if isinstance(stat[key], dict):
+                                    for dict_key in stat[key]:
+                                        if isinstance(stat[key][dict_key], dict):
+                                            for inner_key in stat[key][dict_key]:
+                                                if isinstance(stat[key][dict_key][inner_key], dict):
+                                                    for inner_inner_key in stat[key][dict_key][inner_key]:
+                                                        if not isinstance(stat[key][dict_key][inner_key][inner_inner_key],
+                                                                          list):
+                                                            txt_row += str(
+                                                                stat[key][dict_key][inner_key][inner_inner_key]) + ","
+                                                elif not isinstance(stat[key][dict_key][inner_key], list):
+                                                    txt_row += str(stat[key][dict_key][inner_key]) + ","
+                                        elif not isinstance(stat[key][dict_key], list):
+                                            txt_row += str(stat[key][dict_key]) + ","
+                                elif not isinstance(stat[key], list):
+                                    txt_row += str(stat[key]) + ","
+                            csvfile.write(txt_row + '\n')

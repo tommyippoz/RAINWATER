@@ -1,4 +1,5 @@
 import configparser
+import math
 import os
 import time
 
@@ -9,6 +10,18 @@ import sklearn.metrics
 from rainwater import TimeSeriesSequence
 from rainwater.DecisionPolicy import DecisionPolicy, policy_from_string
 
+
+def get_classifier_name(clf_obj) -> str:
+    """
+    Gets the name of a classifier object
+    :param clf_obj:
+    :return:
+    """
+    invert_op = getattr(clf_obj, "classifier_name", None)
+    if callable(invert_op):
+        return clf_obj.classifier_name()
+    else:
+        return clf_obj.__class__.__name__
 
 def read_csv(filepath: str, kwh_col: str = 'kWh', time_col: str = 'timestamp',
              seq_col: str = 'device_id', batch_size: int = None, limit_rows: int = -1):
@@ -247,11 +260,12 @@ def compute_stats(clf_y, ad_y, test_y, test_seq: list = None, diagnosis_time: in
     classes = numpy.unique(test_y)
     stats['clf'] = compute_single_stats(clf_y, test_y, classes)
     stats['ad'] = compute_single_stats(ad_y, test_y, classes, test_seq, diagnosis_time)
-    stats['classes'] = numpy.array2string(classes)
+    stats['classes'] = "-".join([x for x in classes])
     return stats
 
 
-def compute_single_stats(pred_y, test_y, classes, test_sequences=None, diagnosis_time: int = 1):
+def compute_single_stats(pred_y, test_y, classes, test_sequences=None,
+                         diagnosis_time: int = 1, max_delay: int = 50):
     """
     Computes stats for predicted labels
     :param pred_y: scores of the classifier
@@ -269,7 +283,9 @@ def compute_single_stats(pred_y, test_y, classes, test_sequences=None, diagnosis
         normal_class = 'normal'
         fprs = []
         dds = []
+        dds_per_class = {x: [] for x in classes}
         tprs = []
+        tprs_per_class = {x: [] for x in classes}
         index = 0
         for seq in test_sequences:
 
@@ -280,6 +296,7 @@ def compute_single_stats(pred_y, test_y, classes, test_sequences=None, diagnosis
 
             # Iterating over sequence data
             cooldown = 0
+            det_label = ''
             an_time = -1
             det_time = -1
             false_alerts = []
@@ -292,22 +309,43 @@ def compute_single_stats(pred_y, test_y, classes, test_sequences=None, diagnosis
                         false_alerts.append(i)
                 if an_time < 0 and seq_label[i] != normal_class:
                     an_time = i
+                    det_label = seq_label[i]
                 if cooldown > 0:
                     cooldown -= 1
 
             # Updating metrics
             fprs.append(len(false_alerts) / (seq_label == normal_class).sum())
-            tprs.append(1 if det_time > 0 else 0)
-            dds.append((det_time - an_time) if an_time <= det_time else numpy.NaN)
+            detected = 1 if det_time > 0 and not math.isnan(det_time) else 0
+            tprs.append(detected)
+            tprs_per_class[det_label].append(detected)
+            if detected > 0:
+                dds.append((det_time - an_time) if an_time <= det_time and not math.isnan(det_time) else max_delay)
+                dds_per_class[det_label].append(
+                    (det_time - an_time) if an_time <= det_time and not math.isnan(det_time) else max_delay)
 
-        stats['s_fpr'] = {'avg': float(numpy.average(fprs)), 'min': float(numpy.min(fprs)),
-                          'max': float(numpy.max(fprs)), 'median': float(numpy.median(fprs)), #'all': fprs
-                          }
-        stats['s_tpr'] = {'avg': float(numpy.average(tprs)), 'min': int(numpy.min(tprs)),
-                          'max': int(numpy.max(tprs)), 'median': int(numpy.median(tprs)), #'all': tprs
-                          }
-        stats['s_dd'] = {'avg': float(numpy.nanmean(dds)), 'min': int(numpy.nanmin(dds)),
-                         'max': int(numpy.nanmax(dds)), 'median': int(numpy.nanmedian(dds)), #'all': dds
-                         }
+        stats['overall_fpr'] = {'avg': float(numpy.average(fprs)), 'min': float(numpy.min(fprs)),
+                                'max': float(numpy.max(fprs)), 'median': float(numpy.median(fprs)),  # 'all': fprs
+                                }
+        stats['overall_tpr'] = {'avg': float(numpy.average(tprs)), 'min': int(numpy.min(tprs)),
+                                'max': int(numpy.max(tprs)), 'median': int(numpy.median(tprs)),  # 'all': tprs
+                                }
+        stats['overall_dd'] = {'avg': float(numpy.nanmean(dds)), 'min': int(numpy.nanmin(dds)),
+                               'max': int(numpy.nanmax(dds)), 'median': int(numpy.nanmedian(dds)),  # 'all': dds
+                               } if len(dds) > 0 else {'avg': -1, 'min': -1, 'max': -1, 'median': -1}
+        stats['per_class_tpr'] = {}
+        stats['per_class_dd'] = {}
+        for an_class in tprs_per_class.keys():
+            class_tpr = tprs_per_class[an_class]
+            stats['per_class_tpr'][an_class] = {'avg': float(numpy.average(class_tpr)) if len(class_tpr) > 0 else -1,
+                                                'min': int(numpy.min(class_tpr)) if len(class_tpr) > 0 else -1,
+                                                'max': int(numpy.max(class_tpr)) if len(class_tpr) > 0 else -1,
+                                                'median': int(numpy.median(class_tpr)) if len(class_tpr) > 0 else -1,  # 'all': tprs
+                                                }
+            class_dd = dds_per_class[an_class]
+            stats['per_class_dd'][an_class] = {'avg': float(numpy.nanmean(class_dd)) if len(class_dd) > 0 else -1,
+                                               'min': int(numpy.nanmin(class_dd)) if len(class_dd) > 0 else -1,
+                                               'max': int(numpy.nanmax(class_dd)) if len(class_dd) > 0 else -1,
+                                               'median': int(numpy.nanmedian(class_dd)) if len(class_dd) > 0 else -1,  # 'all': dds
+                                               } if len(class_dd) > 0 else {'avg': -1, 'min': -1, 'max': -1, 'median': -1}
 
     return stats

@@ -22,6 +22,43 @@ def sequences_to_dataset(sequences: list, force_binary: bool = False):
     return dataset, label
 
 
+def sequences_to_unknown_dataset(sequences: list, train_flag: bool = True):
+    """
+    Transforms a list of TimeSeriesSequence to dataset for ML
+    :param train_flag: True if this is training data
+    :param sequences: list of sequences
+    :return: the features and the label
+    """
+    out_data = {}
+    tags = list(numpy.unique([seq.tag.split("#")[1] for seq in sequences]))
+    tags.append("normal")
+    for an_tag in tags:
+        if an_tag == "normal":
+            data_list = []
+            for sequence in sequences:
+                data_list.append(sequence.get_all_data())
+            seqs = copy.deepcopy(sequences)
+        elif train_flag:
+            data_list = []
+            seqs = []
+            for sequence in sequences:
+                if an_tag not in sequence.tag:
+                    data_list.append(sequence.get_all_data())
+                    seqs.append(sequence)
+        else:
+            data_list = []
+            seqs = []
+            for sequence in sequences:
+                if an_tag in sequence.tag:
+                    data_list.append(sequence.get_all_data())
+                    seqs.append(sequence)
+        dataset = pandas.concat(data_list, ignore_index=True)
+        label = numpy.where(dataset['label'].to_numpy() == 'normal', 'normal', 'anomaly')
+        dataset = dataset.drop(columns=['timestamp', 'label'])
+        out_data[an_tag] = [dataset, label, seqs]
+    return out_data
+
+
 class TimeSeriesSequence:
     """
     Class that defines the object of a time-ordered sequence (of power consumption)
@@ -39,7 +76,7 @@ class TimeSeriesSequence:
         self.times = times
         self.values = values
         self.labels = labels
-        self.additional_features = None
+        self.additional_features = pandas.DataFrame()
         if self.labels is None:
             self.labels = ['normal' for _ in range(0, len(values))]
 

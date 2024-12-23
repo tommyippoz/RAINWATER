@@ -61,7 +61,20 @@ def policy_to_string(p_obj: DecisionPolicy):
         return 'none'
 
 
-def apply_policy(clf_y: numpy.ndarray, p_obj: DecisionPolicy, default_tag: str = 'normal'):
+def get_cooldown(p_obj) -> int:
+    """
+    :param p_obj: policy
+    :return: an int for cooldown
+    """
+    if p_obj in [DecisionPolicy.TWO_ROW, DecisionPolicy.TWO_IN_THREE, DecisionPolicy.TWO_IN_FOUR]:
+        return 2
+    elif p_obj in [DecisionPolicy.THREE_ROW, DecisionPolicy.THREE_IN_FOUR]:
+        return 3
+    else:
+        return 1
+
+
+def apply_policy(clf_y: numpy.ndarray, p_obj: DecisionPolicy, default_tag: str = 'normal', cooldown = None):
     """
     Returns predictions according to a specific policy
     :param clf_y: classifier predictions
@@ -70,10 +83,11 @@ def apply_policy(clf_y: numpy.ndarray, p_obj: DecisionPolicy, default_tag: str =
     :return: a numpy array of predictions
     """
     p_y = []
+    last_alarm = 0
     for i in range(0, len(clf_y)):
-        an_last_2 = (clf_y[i-1:i+1] != default_tag).sum() if i > 0 else 0
-        an_last_3 = (clf_y[i-2:i+1] != default_tag).sum() if i > 1 else 0
-        an_last_4 = (clf_y[i-3:i+1] != default_tag).sum() if i > 2 else 0
+        an_last_2 = (clf_y[max(last_alarm+1, i-1):i+1] != default_tag).sum()
+        an_last_3 = (clf_y[max(last_alarm+1, i-2):i+1] != default_tag).sum()
+        an_last_4 = (clf_y[max(last_alarm+1, i-3):i+1] != default_tag).sum()
         if p_obj == DecisionPolicy.TWO_ROW and an_last_2 == 2:
             new_y = clf_y[i]
         elif p_obj == DecisionPolicy.THREE_ROW and an_last_3 == 3:
@@ -87,6 +101,8 @@ def apply_policy(clf_y: numpy.ndarray, p_obj: DecisionPolicy, default_tag: str =
         elif p_obj == DecisionPolicy.NONE:
             new_y = clf_y[i]
         else:
-            new_y = 'normal'
+            new_y = default_tag
         p_y.append(new_y)
+        if new_y != default_tag:
+            last_alarm = i
     return numpy.asarray(p_y)
