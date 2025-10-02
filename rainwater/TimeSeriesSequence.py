@@ -21,6 +21,31 @@ def sequences_to_dataset(sequences: list, force_binary: bool = False):
     dataset = dataset.drop(columns=['timestamp', 'label'])
     return dataset, label
 
+def sequences_to_series_dataset(sequences: list, series_size: int = 3, force_binary: bool = False):
+    """
+    Transforms a list of TimeSeriesSequence to dataset for ML with LSTM
+    :param series_size: the length of each sequence
+    :param force_binary: True if you want classification to be forced as binary
+    :param sequences: list of sequences
+    :return: the features and the label as ndarrays
+    """
+    dataset = []
+    label = []
+    for sequence in sequences:
+        seq_data = sequence.get_all_data()
+        seq_label = seq_data['label'].to_numpy()
+        seq_data = seq_data.drop(columns=['timestamp', 'label']).to_numpy()
+        for i in range(series_size, len(seq_label)):
+            new_data = seq_data[i-series_size:i, :]
+            dataset.append(new_data)
+            new_label = seq_label[i]
+            label.append(new_label)
+    dataset = numpy.asarray(dataset)
+    label = numpy.asarray(label)
+    if force_binary:
+        label = numpy.where(label == 'normal', 'normal', 'anomaly')
+    return dataset, label
+
 
 def sequences_to_unknown_dataset(sequences: list, train_flag: bool = True):
     """

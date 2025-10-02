@@ -7,6 +7,8 @@ import joblib
 import numpy
 import pandas
 import sklearn.ensemble
+from confens.classifiers.ConfidenceBagging import ConfidenceBagging
+from confens.classifiers.ConfidenceBoosting import ConfidenceBoosting
 from logitboost import LogitBoost
 from pyod.models.cblof import CBLOF
 from pyod.models.copod import COPOD
@@ -17,7 +19,7 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier, ExtraTreeClassifier
 from xgboost import XGBClassifier
 
 from rainwater import DecisionPolicy, sequences_to_dataset, current_ms, compute_stats, get_classifier_name, \
@@ -55,14 +57,17 @@ class ModelTrainer:
                 Pipeline([("norm", MinMaxScaler()), ("gnb", GaussianNB())]),
                 RandomForestClassifier(),
                 ExtraTreesClassifier(),
-                LogitBoost()
+                ConfidenceBagging(clf=ExtraTreeClassifier()),
+                ConfidenceBoosting(clf=ExtraTreeClassifier()),
             ]
             if force_binary:
                 contamination = 0.2
                 self.classifiers.extend([UnsupervisedClassifier(COPOD(contamination=contamination)),
                                          UnsupervisedClassifier(HBOS(contamination=contamination)),
                                          UnsupervisedClassifier(CBLOF(contamination=contamination)),
-                                         UnsupervisedClassifier(IForest(contamination=contamination))])
+                                         UnsupervisedClassifier(IForest(contamination=contamination)),
+                                         ConfidenceBagging(clf=HBOS(contamination=contamination)),
+                                         ConfidenceBoosting(clf=HBOS(contamination=contamination))])
 
     def train(self, sequences: list, diagnosis_time: int = 1, models_folder: str = None,
               dataset_name: str = None, save: bool = False, debug: bool = False):
@@ -113,7 +118,7 @@ class ModelTrainer:
             preds[ad_name] = ad_y
             if debug:
                 print('Classifier %s, accuracy %.3f' % (ad_name,
-                                                        sklearn.metrics.balanced_accuracy_score(ad_y, test_y)))
+                                                        sklearn.metrics.balanced_accuracy_score(test_y, ad_y)))
             for policy in self.policies:
                 policy_str = policy_to_string(policy)
                 policy_y = apply_policy(ad_y, policy)
@@ -129,9 +134,9 @@ class ModelTrainer:
                 ad_stats['test_seqs'] = len(test_seq)
                 ad_stats['train_datapoints'] = len(train_y)
                 ad_stats['test_datapoints'] = len(test_y)
-                joblib.dump(ad, "clf_dump.bin", compress=9)
-                ad_stats['model_size_bytes'] = os.stat("clf_dump.bin").st_size
-                os.remove("clf_dump.bin")
+                #joblib.dump(ad, "clf_dump.bin", compress=9)
+                ad_stats['model_size_bytes'] = -1#os.stat("clf_dump.bin").st_size
+                #os.remove("clf_dump.bin")
                 if policy_str not in stats:
                     stats[policy_str] = []
                 stats[policy_str].append(ad_stats)

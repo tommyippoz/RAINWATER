@@ -274,8 +274,8 @@ def compute_single_stats(pred_y, test_y, classes, test_sequences=None,
     :return: a dictionary
     """
     stats = {}
-    stats['accuracy'] = sklearn.metrics.balanced_accuracy_score(pred_y, test_y)
-    stats['mcc'] = sklearn.metrics.matthews_corrcoef(pred_y, test_y)
+    stats['accuracy'] = sklearn.metrics.balanced_accuracy_score(test_y, pred_y)
+    stats['mcc'] = sklearn.metrics.matthews_corrcoef(test_y, pred_y)
     stats['recall_class'] = dict(zip(classes,
                                      sklearn.metrics.recall_score(test_y, pred_y,
                                                                   labels=classes, average=None)))

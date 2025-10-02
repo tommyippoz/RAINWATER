@@ -55,10 +55,10 @@ if __name__ == '__main__':
             #print_full_sequences(big_file, injected_sequences, create_new=create_file)
             # create_file = False
             #
-            # # Performs model training
-            # model, stats, preds = model_trainer.train(injected_sequences, dataset_name=dataset_name,
-            #                                           models_folder=general_cfg['models_folder'],
-            #                                           save=True, debug=True)
+            # Performs model training
+            model, stats, preds = model_trainer.train(injected_sequences, dataset_name=dataset_name,
+                                                      models_folder=general_cfg['models_folder'],
+                                                      save=True, debug=True)
             #
             # # Prints predictions
             # preds_file = os.path.join(general_cfg['output_folder'], dataset_name +
@@ -66,40 +66,40 @@ if __name__ == '__main__':
             #                           "_predictions.csv")
             # preds.to_csv(preds_file, index=False)
             #
-            # # prints csv file containing all stats
-            # with open(os.path.join(general_cfg['output_folder'],
-            #                        dataset_name + ("_binary" if general_cfg['force_binary'] else "_multi") +
-            #                        '_scores.csv'), 'w') as csvfile:
-            #
-            #     # Print Header
-            #     csvfile.write('policy,')
-            #     stat = stats[list(stats.keys())[0]][0]
-            #     for key in stat.keys():
-            #         if isinstance(stat[key], dict):
-            #             for dict_key in stat[key]:
-            #                 if isinstance(stat[key][dict_key], dict):
-            #                     for inner_key in stat[key][dict_key]:
-            #                         if not isinstance(stat[key][dict_key][inner_key], list):
-            #                             csvfile.write(key + "." + dict_key + "." + inner_key + ",")
-            #                 elif not isinstance(stat[key][dict_key], list):
-            #                     csvfile.write(key + "." + dict_key + ",")
-            #         elif not isinstance(stat[key], list):
-            #             csvfile.write(key + ",")
-            #     csvfile.write('\n')
-            #
-            #     # Print Data
-            #     for policy in stats:
-            #         for stat in stats[policy]:
-            #             txt_row = policy + ","
-            #             for key in stat.keys():
-            #                 if isinstance(stat[key], dict):
-            #                     for dict_key in stat[key]:
-            #                         if isinstance(stat[key][dict_key], dict):
-            #                             for inner_key in stat[key][dict_key]:
-            #                                 if not isinstance(stat[key][dict_key][inner_key], list):
-            #                                     txt_row += str(stat[key][dict_key][inner_key]) + ","
-            #                         elif not isinstance(stat[key][dict_key], list):
-            #                             txt_row += str(stat[key][dict_key]) + ","
-            #                 elif not isinstance(stat[key], list):
-            #                     txt_row += str(stat[key]) + ","
-            #             csvfile.write(txt_row + '\n')
+            # prints csv file containing all stats
+            with open(os.path.join(general_cfg['output_folder'],
+                                   dataset_name + ("_binary" if general_cfg['force_binary'] else "_multi") +
+                                   '_scores.csv'), 'w') as csvfile:
+
+                # Print Header
+                csvfile.write('policy,')
+                stat = stats[list(stats.keys())[0]][0]
+                for key in stat.keys():
+                    if isinstance(stat[key], dict):
+                        for dict_key in stat[key]:
+                            if isinstance(stat[key][dict_key], dict):
+                                for inner_key in stat[key][dict_key]:
+                                    if not isinstance(stat[key][dict_key][inner_key], list):
+                                        csvfile.write(key + "." + dict_key + "." + inner_key + ",")
+                            elif not isinstance(stat[key][dict_key], list):
+                                csvfile.write(key + "." + dict_key + ",")
+                    elif not isinstance(stat[key], list):
+                        csvfile.write(key + ",")
+                csvfile.write('\n')
+
+                # Print Data
+                for policy in stats:
+                    for stat in stats[policy]:
+                        txt_row = policy + ","
+                        for key in stat.keys():
+                            if isinstance(stat[key], dict):
+                                for dict_key in stat[key]:
+                                    if isinstance(stat[key][dict_key], dict):
+                                        for inner_key in stat[key][dict_key]:
+                                            if not isinstance(stat[key][dict_key][inner_key], list):
+                                                txt_row += str(stat[key][dict_key][inner_key]) + ","
+                                    elif not isinstance(stat[key][dict_key], list):
+                                        txt_row += str(stat[key][dict_key]) + ","
+                            elif not isinstance(stat[key], list):
+                                txt_row += str(stat[key]) + ","
+                        csvfile.write(txt_row + '\n')

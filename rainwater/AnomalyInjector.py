@@ -251,7 +251,10 @@ class ThresholdInjector(AnomalyInjector):
             changes = numpy.append(changes, len(inj_labels))
         changes = changes.reshape(int(len(changes) / 2.0), 2)
         change_len = changes[:, 1] - changes[:, 0]
-        max_int = changes[numpy.argmax(change_len), :]
+        if len(change_len) > 0:
+            max_int = changes[numpy.argmax(change_len), :]
+        else:
+            max_int = [0, -1]
         inj_labels = [False if (i < max_int[0] or i >= max_int[1]) else True
                       for i in range(0, len(series_slice))]
         return inj_labels
