@@ -1,3 +1,4 @@
+import copy
 import os.path
 
 import numpy
@@ -46,7 +47,8 @@ if __name__ == '__main__':
             print_full_sequences("my_file.csv", injected_sequences, create_new=True)
 
             # Performs model training
-            model, stats, preds = model_trainer.train(injected_sequences, dataset_name="my dataset",
+            model, stats, preds = model_trainer.train(injected_sequences,
+                                                      dataset_name="my dataset",
                                                       models_folder=general_cfg['models_folder'],
                                                       save=False, debug=True)
 

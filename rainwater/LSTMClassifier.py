@@ -1,3 +1,4 @@
+import collections
 import os
 
 import numpy
@@ -21,7 +22,7 @@ class LSTMClassifier:
     You have to override the encode_sequences method to transform the output into something the LSTM can use
     """
 
-    def __init__(self, seq_length: int = 3, epochs: int = 20, batch_size: int = 32):
+    def __init__(self, seq_length: int = 3, epochs: int = 20, batch_size: int = 32, force_binary = False):
         """
         Constructor of the LSTM object.
         :param seq_length:
@@ -31,6 +32,7 @@ class LSTMClassifier:
         self.seq_length = seq_length
         self.epochs = epochs
         self.batch_size = batch_size
+        self.force_binary = force_binary
         self.model = None
         self.unique_labels = None
         self.le = LabelEncoder()
@@ -49,7 +51,7 @@ class LSTMClassifier:
         model = tf.keras.models.Model(inputs=input_layer, outputs=output)
         return model
 
-    def fit(self, X, y):
+    def fit(self, X, y=None):
         """
         Typical sklearn-like fit function
         :param X:
@@ -60,6 +62,8 @@ class LSTMClassifier:
         X_enc, y_enc = self.encode_sequences(X)
         # Encode Label
         y_enc = self.le.fit_transform(y_enc)
+        class_weights = dict(collections.Counter(y_enc))
+        d = {tag: (len(y_enc) - class_weights[tag])/len(y_enc) for tag in class_weights.keys()}
         self.unique_labels = self.le.classes_
         # Build Model
         self.model = self.make_simpler_lstm_model(input_shape=X_enc.shape[1:])
@@ -75,7 +79,7 @@ class LSTMClassifier:
         )
         # Train Model
         self.model.fit(X_enc, y_enc, batch_size=self.batch_size, epochs=self.epochs, callbacks=callbacks,
-                       validation_split=0.2, verbose=1)
+                       validation_split=0.2, verbose=1, class_weight=d)
 
     def predict_proba(self, X):
         """
@@ -83,18 +87,19 @@ class LSTMClassifier:
         :param X:
         :return:
         """
-        X_enc = self.encode_sequences(X)
-        preds = self.model.predict(X_enc, batch_size=self.batch_size)
+        X_enc, y = self.encode_sequences(X)
+        preds = self.model.predict(X_enc)
         return numpy.asarray(preds)
 
     def predict(self, X):
         """
-        Typical sklearn-like predict function
+        Outputs (softmax) probabilities
         :param X:
         :return:
         """
-        preds = self.predict_proba(X)
-        return self.unique_labels[numpy.argmax(preds, axis=1)]
+        probas = self.predict_proba(X)
+        preds = numpy.argmax(probas, axis=1)
+        return self.unique_labels[preds]
 
     def encode_sequences(self, X):
         """
@@ -102,28 +107,6 @@ class LSTMClassifier:
         :param X:
         :return:
         """
-        return X, None
-
-
-class RainwaterLSTM(LSTMClassifier):
-    """
-    Overridden class for Rainwater
-    """
-
-    def __init__(self, seq_length: int = 3, epochs: int = 20, batch_size: int = 32):
-        """
-        Constructor of the LSTM object.
-        :param seq_length:
-        :param epochs:
-        :param batch_size:
-        """
-        super.__init__(seq_length, epochs, batch_size)
-
-    def encode_sequences(self, X):
-        """
-        Function to be overridden that transfroms the input into  sequence-like thing the LSTM can process
-        :param X:
-        :return:
-        """
-        data, label = sequences_to_series_dataset(X, self.seq_length, False)
+        data, label = sequences_to_series_dataset(X, self.seq_length, self.force_binary, True)
         return data, label
+

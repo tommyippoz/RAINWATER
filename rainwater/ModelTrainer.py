@@ -25,6 +25,7 @@ from xgboost import XGBClassifier
 from rainwater import DecisionPolicy, sequences_to_dataset, current_ms, compute_stats, get_classifier_name, \
     sequences_to_unknown_dataset
 from rainwater.DecisionPolicy import policy_to_string, apply_policy
+from rainwater.LSTMClassifier import LSTMClassifier
 
 
 class ModelTrainer:
@@ -50,6 +51,7 @@ class ModelTrainer:
             self.classifiers = clf_list
         else:
             self.classifiers = [
+                LSTMClassifier(force_binary=force_binary),
                 LinearDiscriminantAnalysis(),
                 QuadraticDiscriminantAnalysis(),
                 XGB(),
@@ -59,6 +61,7 @@ class ModelTrainer:
                 ExtraTreesClassifier(),
                 ConfidenceBagging(clf=ExtraTreeClassifier()),
                 ConfidenceBoosting(clf=ExtraTreeClassifier()),
+
             ]
             if force_binary:
                 contamination = 0.2
@@ -73,6 +76,7 @@ class ModelTrainer:
               dataset_name: str = None, save: bool = False, debug: bool = False):
         """
         Trains a model for a specific dataset of sequences
+        :param clean_sequences: clean sequences, no additional features
         :param save: True if the model and stats have to be saved to joblib and JSON files
         :param dataset_name: the name/tag of the dataset
         :param models_folder: the folder used to load/store models
@@ -89,11 +93,14 @@ class ModelTrainer:
             print('%d train sequences (%d data points) and %d test sequences (%d data points)'
                   % (len(train_seq), len(train_y), len(test_seq), len(test_y)))
 
-        return self.train_model(train_seq, test_seq, train_x, train_y, test_x, test_y, diagnosis_time,
+        return self.train_model(train_seq, test_seq, train_x, train_y, test_x, test_y,
+                                diagnosis_time,
                                 models_folder, dataset_name, save, debug)
 
-    def train_model(self, train_seq, test_seq, train_x, train_y, test_x, test_y, diagnosis_time: int = 1,
-                    models_folder: str = None, dataset_name: str = None, save: bool = False, debug: bool = False):
+    def train_model(self, train_seq, test_seq, train_x, train_y, test_x, test_y,
+                    diagnosis_time: int = 1,
+                    models_folder: str = None, dataset_name: str = None, save: bool = False,
+                    debug: bool = False):
         """
         Trains a model for a specific dataset of sequences
         :param save: True if the model and stats have to be saved to joblib and JSON files
@@ -111,9 +118,14 @@ class ModelTrainer:
             ad = copy.deepcopy(clf)
             ad_name = get_classifier_name(ad)
             start_ms = current_ms()
-            ad.fit(train_x.to_numpy(), train_y)
-            train_ms = current_ms()
-            ad_y = ad.predict(test_x.to_numpy())
+            if isinstance(clf, LSTMClassifier):
+                ad.fit(train_seq)
+                train_ms = current_ms()
+                ad_y = ad.predict(test_seq)
+            else:
+                ad.fit(train_x.to_numpy(), train_y)
+                train_ms = current_ms()
+                ad_y = ad.predict(test_x.to_numpy())
             test_ms = current_ms()
             preds[ad_name] = ad_y
             if debug:
@@ -134,9 +146,9 @@ class ModelTrainer:
                 ad_stats['test_seqs'] = len(test_seq)
                 ad_stats['train_datapoints'] = len(train_y)
                 ad_stats['test_datapoints'] = len(test_y)
-                #joblib.dump(ad, "clf_dump.bin", compress=9)
-                ad_stats['model_size_bytes'] = -1#os.stat("clf_dump.bin").st_size
-                #os.remove("clf_dump.bin")
+                # joblib.dump(ad, "clf_dump.bin", compress=9)
+                ad_stats['model_size_bytes'] = -1  # os.stat("clf_dump.bin").st_size
+                # os.remove("clf_dump.bin")
                 if policy_str not in stats:
                     stats[policy_str] = []
                 stats[policy_str].append(ad_stats)
@@ -205,7 +217,8 @@ class UnknownModelTrainer(ModelTrainer):
         for tag in train_data:
             if debug:
                 print("\n---------------------- Processing unknown tag: %s ------------------------------\n" % tag)
-            model, stats, preds = self.train_model(train_data[tag][2], test_data[tag][2], train_data[tag][0], train_data[tag][1],
+            model, stats, preds = self.train_model(train_data[tag][2], test_data[tag][2], train_data[tag][0],
+                                                   train_data[tag][1],
                                                    test_data[tag][0], test_data[tag][1], diagnosis_time,
                                                    models_folder, dataset_name, save, debug)
             results[tag] = [model, stats, preds]

@@ -1,4 +1,5 @@
 import copy
+import random
 
 import numpy
 import pandas
@@ -21,7 +22,9 @@ def sequences_to_dataset(sequences: list, force_binary: bool = False):
     dataset = dataset.drop(columns=['timestamp', 'label'])
     return dataset, label
 
-def sequences_to_series_dataset(sequences: list, series_size: int = 3, force_binary: bool = False):
+
+def sequences_to_series_dataset(sequences: list, series_size: int = 3,
+                                force_binary: bool = False, only_values: bool = False):
     """
     Transforms a list of TimeSeriesSequence to dataset for ML with LSTM
     :param series_size: the length of each sequence
@@ -32,11 +35,20 @@ def sequences_to_series_dataset(sequences: list, series_size: int = 3, force_bin
     dataset = []
     label = []
     for sequence in sequences:
-        seq_data = sequence.get_all_data()
+        if only_values:
+            seq_data = sequence.get_base_data()
+        else:
+            seq_data = sequence.get_all_data()
         seq_label = seq_data['label'].to_numpy()
         seq_data = seq_data.drop(columns=['timestamp', 'label']).to_numpy()
-        for i in range(series_size, len(seq_label)):
-            new_data = seq_data[i-series_size:i, :]
+        for i in range(0, len(seq_label)):
+            if i + 1 < series_size:
+                new_data = list(seq_data[0:i+1])
+                for j in range (i, series_size-1):
+                    new_data = [new_data[i]*(100-(j-i+1))/100] + new_data
+                new_data = numpy.asarray(new_data)
+            else:
+                new_data = seq_data[i+1-series_size:i+1]
             dataset.append(new_data)
             new_label = seq_label[i]
             label.append(new_label)
@@ -211,6 +223,13 @@ class TimeSeriesSequence:
 
     def get_all_data(self):
         all_df = copy.deepcopy(self.additional_features)
+        all_df['timestamp'] = self.times
+        all_df['consumption'] = self.values
+        all_df['label'] = self.labels
+        return all_df
+
+    def get_base_data(self):
+        all_df = pandas.DataFrame()
         all_df['timestamp'] = self.times
         all_df['consumption'] = self.values
         all_df['label'] = self.labels
