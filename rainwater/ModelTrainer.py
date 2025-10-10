@@ -51,26 +51,47 @@ class ModelTrainer:
             self.classifiers = clf_list
         else:
             self.classifiers = [
-                LSTMClassifier(force_binary=force_binary),
+                LSTMClassifier(seq_length=3, force_binary=force_binary, batch_size=64),
+                LSTMClassifier(seq_length=5, force_binary=force_binary, batch_size=64),
+                LSTMClassifier(seq_length=10, force_binary=force_binary, batch_size=64),
+                LSTMClassifier(seq_length=20, force_binary=force_binary, batch_size=64),
+                LSTMClassifier(seq_length=30, force_binary=force_binary, batch_size=64),
+                LSTMClassifier(seq_length=50, force_binary=force_binary, batch_size=64),
+                LSTMClassifier(seq_length=100, force_binary=force_binary, batch_size=64),
+                LSTMClassifier(seq_length=3, force_binary=force_binary, batch_size=32),
+                LSTMClassifier(seq_length=5, force_binary=force_binary, batch_size=32),
+                LSTMClassifier(seq_length=10, force_binary=force_binary, batch_size=32),
+                LSTMClassifier(seq_length=20, force_binary=force_binary, batch_size=32),
+                LSTMClassifier(seq_length=30, force_binary=force_binary, batch_size=32),
+                LSTMClassifier(seq_length=50, force_binary=force_binary, batch_size=32),
+                LSTMClassifier(seq_length=100, force_binary=force_binary, batch_size=32),
+                LSTMClassifier(seq_length=3, force_binary=force_binary, batch_size=128),
+                LSTMClassifier(seq_length=5, force_binary=force_binary, batch_size=128),
+                LSTMClassifier(seq_length=10, force_binary=force_binary, batch_size=128),
+                LSTMClassifier(seq_length=20, force_binary=force_binary, batch_size=128),
+                LSTMClassifier(seq_length=30, force_binary=force_binary, batch_size=128),
+                LSTMClassifier(seq_length=50, force_binary=force_binary, batch_size=128),
+                LSTMClassifier(seq_length=100, force_binary=force_binary, batch_size=128),
+
                 LinearDiscriminantAnalysis(),
-                QuadraticDiscriminantAnalysis(),
-                XGB(),
+                #QuadraticDiscriminantAnalysis(),
+                #XGB(),
                 DecisionTreeClassifier(),
-                Pipeline([("norm", MinMaxScaler()), ("gnb", GaussianNB())]),
+                #Pipeline([("norm", MinMaxScaler()), ("gnb", GaussianNB())]),
                 RandomForestClassifier(),
-                ExtraTreesClassifier(),
-                ConfidenceBagging(clf=ExtraTreeClassifier()),
-                ConfidenceBoosting(clf=ExtraTreeClassifier()),
+                #ExtraTreesClassifier(),
+                #ConfidenceBagging(clf=ExtraTreeClassifier()),
+                #ConfidenceBoosting(clf=ExtraTreeClassifier()),
 
             ]
-            if force_binary:
-                contamination = 0.2
-                self.classifiers.extend([UnsupervisedClassifier(COPOD(contamination=contamination)),
-                                         UnsupervisedClassifier(HBOS(contamination=contamination)),
-                                         UnsupervisedClassifier(CBLOF(contamination=contamination)),
-                                         UnsupervisedClassifier(IForest(contamination=contamination)),
-                                         ConfidenceBagging(clf=HBOS(contamination=contamination)),
-                                         ConfidenceBoosting(clf=HBOS(contamination=contamination))])
+            # if force_binary:
+            #     contamination = 0.2
+            #     self.classifiers.extend([UnsupervisedClassifier(COPOD(contamination=contamination)),
+            #                              UnsupervisedClassifier(HBOS(contamination=contamination)),
+            #                              UnsupervisedClassifier(CBLOF(contamination=contamination)),
+            #                              UnsupervisedClassifier(IForest(contamination=contamination)),
+            #                              ConfidenceBagging(clf=HBOS(contamination=contamination)),
+            #                              ConfidenceBoosting(clf=HBOS(contamination=contamination))])
 
     def train(self, sequences: list, diagnosis_time: int = 1, models_folder: str = None,
               dataset_name: str = None, save: bool = False, debug: bool = False):

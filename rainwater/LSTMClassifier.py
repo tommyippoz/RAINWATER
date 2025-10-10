@@ -1,6 +1,7 @@
 import collections
 import os
 
+import keras
 import numpy
 from sklearn.preprocessing import LabelEncoder
 
@@ -22,7 +23,8 @@ class LSTMClassifier:
     You have to override the encode_sequences method to transform the output into something the LSTM can use
     """
 
-    def __init__(self, seq_length: int = 3, epochs: int = 20, batch_size: int = 32, force_binary = False):
+    def __init__(self, seq_length: int = 3, epochs: int = 20, batch_size: int = 32, tv_split:float = 0.2,
+                 class_weigth: bool = True, force_binary: bool = False):
         """
         Constructor of the LSTM object.
         :param seq_length:
@@ -32,6 +34,8 @@ class LSTMClassifier:
         self.seq_length = seq_length
         self.epochs = epochs
         self.batch_size = batch_size
+        self.class_weight = class_weigth
+        self.tv_split = tv_split
         self.force_binary = force_binary
         self.model = None
         self.unique_labels = None
@@ -44,9 +48,9 @@ class LSTMClassifier:
         :return:
         """
         input_layer = tf.keras.layers.Input(shape=input_shape)
-        lstm = tf.keras.layers.LSTM(64, return_sequences=False, name='lstm')(input_layer)
-        dense = tf.keras.layers.Dense(64, activation='relu')(lstm)
-        dropout = tf.keras.layers.Dropout(0.3)(dense)
+        lstm = tf.keras.layers.GRU(32, return_sequences=False)(input_layer)
+        dense = tf.keras.layers.Dense(32, activation='relu')(lstm)
+        dropout = tf.keras.layers.Dropout(0.5)(dense)
         output = tf.keras.layers.Dense(len(self.unique_labels), activation='softmax')(dropout)
         model = tf.keras.models.Model(inputs=input_layer, outputs=output)
         return model
@@ -63,23 +67,27 @@ class LSTMClassifier:
         # Encode Label
         y_enc = self.le.fit_transform(y_enc)
         class_weights = dict(collections.Counter(y_enc))
-        d = {tag: (len(y_enc) - class_weights[tag])/len(y_enc) for tag in class_weights.keys()}
+        class_weights = {tag: (len(y_enc) - class_weights[tag])/len(y_enc) for tag in class_weights.keys()}
         self.unique_labels = self.le.classes_
         # Build Model
         self.model = self.make_simpler_lstm_model(input_shape=X_enc.shape[1:])
         callbacks = [
             tf.keras.callbacks.ModelCheckpoint("best_model.h5", save_best_only=True, monitor="val_loss"),
             tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=1, min_lr=0.0001),
-            tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3, verbose=1),
+            tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, verbose=0),
         ]
         self.model.compile(
             optimizer="adam",
             loss="sparse_categorical_crossentropy",
-            metrics=["sparse_categorical_accuracy"],
+            metrics=["accuracy"],
         )
         # Train Model
-        self.model.fit(X_enc, y_enc, batch_size=self.batch_size, epochs=self.epochs, callbacks=callbacks,
-                       validation_split=0.2, verbose=1, class_weight=d)
+        if self.class_weight:
+            self.model.fit(X_enc, y_enc, batch_size=self.batch_size, epochs=self.epochs, callbacks=callbacks,
+                           validation_split=self.tv_split, verbose=0, class_weight=class_weights)
+        else:
+            self.model.fit(X_enc, y_enc, batch_size=self.batch_size, epochs=self.epochs, callbacks=callbacks,
+                           validation_split=self.tv_split, verbose=0)
 
     def predict_proba(self, X):
         """
@@ -88,7 +96,7 @@ class LSTMClassifier:
         :return:
         """
         X_enc, y = self.encode_sequences(X)
-        preds = self.model.predict(X_enc)
+        preds = self.model.predict(X_enc, verbose=0)
         return numpy.asarray(preds)
 
     def predict(self, X):
